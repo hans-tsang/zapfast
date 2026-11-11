@@ -779,6 +779,7 @@ fn starred_row(
     if !ui.is_rect_visible(rect) {
         return;
     }
+    let veiled = super::veil::hides(ui, app.privacy_screen, rect) && !response.has_focus();
     if response.hovered() {
         ui.painter()
             .rect_filled(rect, 6.0, palette.surface_hover.gamma_multiply(0.5));
@@ -792,13 +793,14 @@ fn starred_row(
         width - 140.0,
         1,
     );
-    name_line.paint(
+    name_line.paint_veiled(
         ui,
         pos2(
             rect.left() + 16.0,
             rect.top() + 14.0 - name_line.size().y / 2.0,
         ),
         palette.text,
+        veiled,
     );
     ui.painter().text(
         pos2(rect.right() - 16.0, rect.top() + 14.0),
@@ -828,10 +830,11 @@ fn starred_row(
             palette.bubble_in
         },
     );
-    body.paint(
+    body.paint_veiled(
         ui,
         pos2(bubble.left() + 10.0, bubble.top() + 6.0),
         palette.text,
+        veiled,
     );
     clock.paint(
         ui,
@@ -1308,21 +1311,26 @@ fn hit_row(app: &mut App, ui: &mut egui::Ui, hit: &Message) {
         Sense::click(),
     );
     theme::reveal_focus(&response);
+    let veiled = super::veil::hides(ui, app.privacy_screen, rect) && !response.has_focus();
     if ui.is_rect_visible(rect) {
         if response.hovered() {
             widgets::row_highlight(ui, &palette, rect, palette.surface_hover);
         }
         let avatar_rect =
             Rect::from_center_size(pos2(rect.left() + 38.0, rect.center().y), Vec2::splat(48.0));
-        let picture = app.avatar(&hit.chat);
-        widgets::paint_avatar(
-            ui,
-            &palette,
-            avatar_rect,
-            &title,
-            &hit.chat,
-            picture.as_deref(),
-        );
+        if veiled {
+            super::veil::avatar(ui, &palette, avatar_rect);
+        } else {
+            let picture = app.avatar(&hit.chat);
+            widgets::paint_avatar(
+                ui,
+                &palette,
+                avatar_rect,
+                &title,
+                &hit.chat,
+                picture.as_deref(),
+            );
+        }
         let left = rect.left() + 76.0;
         let right = rect.right() - 14.0;
         let stamp_galley = ui.painter().layout_no_wrap(
@@ -1338,7 +1346,7 @@ fn hit_row(app: &mut App, ui: &mut egui::Ui, hit: &Message) {
         );
         let name_width = (right - stamp_galley.size().x - 8.0 - left).max(0.0);
         let name = widgets::line(ui, &title, theme::medium(14.5), palette.text, name_width, 1);
-        name.paint(ui, pos2(left, name_top), palette.text);
+        name.paint_veiled(ui, pos2(left, name_top), palette.text, veiled);
         // Show the sender for group messages.
         let line_y = rect.top() + 38.0;
         let mut x = left;
@@ -1351,7 +1359,7 @@ fn hit_row(app: &mut App, ui: &mut egui::Ui, hit: &Message) {
                 (right - x) * 0.5,
                 1,
             );
-            who.paint(ui, pos2(x, line_y), palette.dim);
+            who.paint_veiled(ui, pos2(x, line_y), palette.dim, veiled);
             x += who.size().x;
         } else if crate::model::ChatKind::from_id(&hit.chat) == crate::model::ChatKind::Group {
             let sender = app.display_name_or(&hit.sender, hit.sender_name.as_deref());
@@ -1364,7 +1372,7 @@ fn hit_row(app: &mut App, ui: &mut egui::Ui, hit: &Message) {
                 (right - x) * 0.5,
                 1,
             );
-            who.paint(ui, pos2(x, line_y), palette.dim);
+            who.paint_veiled(ui, pos2(x, line_y), palette.dim, veiled);
             x += who.size().x;
         }
         let words = widgets::line(
@@ -1375,7 +1383,7 @@ fn hit_row(app: &mut App, ui: &mut egui::Ui, hit: &Message) {
             (right - x).max(0.0),
             1,
         );
-        words.paint(ui, pos2(x, line_y), palette.dim);
+        words.paint_veiled(ui, pos2(x, line_y), palette.dim, veiled);
     }
     let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
     if response.clicked() {
@@ -1544,6 +1552,7 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
         Sense::click(),
     );
     theme::reveal_focus(&response);
+    let veiled = super::veil::hides(ui, app.privacy_screen, rect) && !response.has_focus();
     // The preview area and the whole last message, when the row cuts it short.
     let mut full_preview: Option<(Rect, String, String)> = None;
     response.widget_info(|| {
@@ -1562,15 +1571,19 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
         }
         let avatar_rect =
             Rect::from_center_size(pos2(rect.left() + 38.0, rect.center().y), Vec2::splat(48.0));
-        let picture = app.avatar(&chat.id);
-        widgets::paint_avatar(
-            ui,
-            &palette,
-            avatar_rect,
-            &title,
-            &chat.id,
-            picture.as_deref(),
-        );
+        if veiled {
+            super::veil::avatar(ui, &palette, avatar_rect);
+        } else {
+            let picture = app.avatar(&chat.id);
+            widgets::paint_avatar(
+                ui,
+                &palette,
+                avatar_rect,
+                &title,
+                &chat.id,
+                picture.as_deref(),
+            );
+        }
         if chat.disappearing_timer().is_some() {
             widgets::paint_disappearing_badge(ui, &palette, avatar_rect);
         }
@@ -1604,7 +1617,7 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
             theme::medium(14.5)
         };
         let name = widgets::line(ui, &title, name_font, palette.text, name_width, 1);
-        name.paint(ui, pos2(left, name_top), palette.text);
+        name.paint_veiled(ui, pos2(left, name_top), palette.text, veiled);
 
         // Leave room for badges beside the latest-message preview.
         let mut badge_right = right;
@@ -1719,7 +1732,7 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
                     1,
                 );
                 let width = sender.size().x;
-                sender.paint(ui, pos2(x, line_y), preview_color);
+                sender.paint_veiled(ui, pos2(x, line_y), preview_color, veiled);
                 x += width;
             }
             let words = widgets::line(
@@ -1735,7 +1748,7 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
             );
             // The row shows one line: offer the whole message when that line
             // was cut short or the message has more lines than it.
-            if words.galley.elided || last.full.trim_end() != last.summary {
+            if !veiled && (words.galley.elided || last.full.trim_end() != last.summary) {
                 let area = Rect::from_min_max(
                     pos2(left, line_y - 4.0),
                     pos2(badge_right, line_y + words.size().y.max(16.0) + 4.0),
@@ -1746,7 +1759,7 @@ fn row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response {
         } else {
             widgets::line(ui, "", theme::regular(13.0), preview_color, 1.0, 1)
         };
-        preview.paint(ui, pos2(x, line_y), preview_color);
+        preview.paint_veiled(ui, pos2(x, line_y), preview_color, veiled);
     }
     let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
     if let Some((area, prefix, full)) = full_preview {
@@ -2062,15 +2075,19 @@ fn compact_row(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> egui::Response 
             );
         }
         let avatar_rect = Rect::from_center_size(rect.center(), Vec2::splat(COMPACT_AVATAR));
-        let picture = app.avatar(&chat.id);
-        widgets::paint_avatar(
-            ui,
-            &palette,
-            avatar_rect,
-            &title,
-            &chat.id,
-            picture.as_deref(),
-        );
+        if super::veil::hides(ui, app.privacy_screen, rect) && !response.has_focus() {
+            super::veil::avatar(ui, &palette, avatar_rect);
+        } else {
+            let picture = app.avatar(&chat.id);
+            widgets::paint_avatar(
+                ui,
+                &palette,
+                avatar_rect,
+                &title,
+                &chat.id,
+                picture.as_deref(),
+            );
+        }
         if chat.disappearing_timer().is_some() {
             widgets::paint_disappearing_badge(ui, &palette, avatar_rect);
         }

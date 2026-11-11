@@ -106,6 +106,11 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
             key(Modifiers::COMMAND, Key::E, archive);
         }
         key(Modifiers::COMMAND, Key::B, Action::ToggleSidebar);
+        key(
+            Modifiers::COMMAND | Modifiers::SHIFT,
+            Key::P,
+            Action::TogglePrivacyScreen,
+        );
         key(Modifiers::COMMAND, Key::Comma, Action::ToggleSettings);
         key(Modifiers::COMMAND, Key::Q, Action::Quit);
         key(Modifiers::COMMAND, Key::W, Action::CloseWindow);
@@ -1102,6 +1107,10 @@ pub const SHORTCUTS: &[(&str, &str)] = &[
     ),
     ("Ctrl+C", "Copy the selected messages"),
     ("Ctrl+B", "Collapse or expand the chat list"),
+    (
+        "Ctrl+Shift+P",
+        "Privacy screen: hide names, pictures and messages until pointed at",
+    ),
     (
         "Ctrl+End",
         "Jump to the newest message (when the input is empty)",

@@ -768,6 +768,9 @@ pub struct App {
     /// The new-contact dialog's "Save to phone" box.
     pub new_contact_to_phone: bool,
     pub sidebar_visible: bool,
+    /// The privacy screen hides names, pictures and messages until the
+    /// pointer rests on them (`ui::veil`). Never saved.
+    pub privacy_screen: bool,
     /// Demo/test: keep this starred row's context menu open.
     #[cfg(any(test, feature = "demo"))]
     pub open_list_menu: Option<(ChatId, String)>,
@@ -1710,6 +1713,7 @@ impl App {
             group_description_edit: None,
             new_contact_to_phone: true,
             sidebar_visible: true,
+            privacy_screen: false,
             #[cfg(any(test, feature = "demo"))]
             open_list_menu: None,
             label_name: String::new(),
@@ -2553,7 +2557,7 @@ impl App {
         let Some(chat) = self.chat(chat_id) else {
             return;
         };
-        if self.app_lock.is_locked() || !self.settings.notification_content {
+        if self.app_lock.is_locked() || !self.settings.notification_content || self.privacy_screen {
             self.notify_without_content(chat_id, chat.is_group(), &message.id, limited);
             return;
         }
@@ -2598,8 +2602,8 @@ impl App {
         self.wants_attention = true;
     }
 
-    /// Announces a message while the app lock is on, or with notification
-    /// content turned off: "New message" from ZapFast, without the chat, the
+    /// Announces a message while the app lock or the privacy screen is on,
+    /// or with notification content turned off: "New message" from ZapFast, without the chat, the
     /// sender, the text or a picture, so the desktop shows nothing the lock
     /// screen hides. A chat's own sound and the mention sound would tell who
     /// wrote, so only the message sound plays, still silent for groups when
@@ -9230,6 +9234,18 @@ impl App {
                 });
             }
             Action::ToggleSidebar => self.sidebar_visible = !self.sidebar_visible,
+            Action::TogglePrivacyScreen => {
+                self.privacy_screen = !self.privacy_screen;
+                let said = if self.privacy_screen {
+                    crate::i18n::gettext(
+                        self.locale,
+                        "Privacy screen on: point at something to read it",
+                    )
+                } else {
+                    crate::i18n::gettext(self.locale, "Privacy screen off")
+                };
+                self.toast(said);
+            }
             Action::SetChatFilter(filter) => {
                 if self.locked_folder {
                     self.close_locked_folder();
@@ -26906,6 +26922,31 @@ mod app_lock_tests {
         assert_eq!(shown.sound, app.settings.message_sound);
 
         app.settings.notification_content = true;
+        app.maybe_notify(CHAT, &message);
+        let shown = app.notifications.shown.last().unwrap();
+        assert_eq!(shown.title, "Ada Lovelace");
+        assert_eq!(shown.body, "the engine is ready");
+    }
+
+    #[test]
+    fn the_privacy_screen_hides_notification_content_until_toggled_off() {
+        let mut app = unlocked_app();
+        let ctx = egui::Context::default();
+        let message = incoming(&mut app);
+        app.apply(Action::TogglePrivacyScreen, &ctx);
+        assert!(app.privacy_screen);
+        app.maybe_notify(CHAT, &message);
+        let shown = app.notifications.shown.last().unwrap().clone();
+        assert_eq!(shown.title, "ZapFast");
+        assert_eq!(shown.body, "New message");
+        assert_eq!(shown.picture, None);
+        assert!(
+            app.settings.notification_content,
+            "the setting is untouched"
+        );
+
+        app.apply(Action::TogglePrivacyScreen, &ctx);
+        assert!(!app.privacy_screen);
         app.maybe_notify(CHAT, &message);
         let shown = app.notifications.shown.last().unwrap();
         assert_eq!(shown.title, "Ada Lovelace");

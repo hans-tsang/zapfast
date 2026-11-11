@@ -24,6 +24,12 @@ impl Line {
     }
 
     pub fn paint(&self, ui: &Ui, pos: egui::Pos2, fallback: Color32) {
+        self.paint_veiled(ui, pos, fallback, false);
+    }
+
+    /// Paints the text, or with `veiled` a bar in its place for the privacy
+    /// screen, keeping the text for screen readers either way.
+    pub fn paint_veiled(&self, ui: &Ui, pos: egui::Pos2, fallback: Color32, veiled: bool) {
         let response = ui.interact(
             Rect::from_min_size(pos, self.size()),
             ui.id()
@@ -37,6 +43,18 @@ impl Line {
                 &self.accessible_text,
             )
         });
+        if veiled {
+            for row in &self.galley.rows {
+                let width = row.size.x.min(self.size().x);
+                super::veil::line(
+                    ui,
+                    pos + row.pos.to_vec2(),
+                    vec2(width, row.size.y),
+                    fallback,
+                );
+            }
+            return;
+        }
         ui.painter().galley(pos, self.galley.clone(), fallback);
         emoji::paint(ui, &self.galley, pos, &self.placements);
     }

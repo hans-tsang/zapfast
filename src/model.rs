@@ -3188,6 +3188,8 @@ pub enum Action {
     ShowDialog(Dialog),
     CloseDialog,
     ToggleSidebar,
+    /// Turns the privacy screen on or off (`ui::veil`).
+    TogglePrivacyScreen,
     SetChatFilter(ChatFilter),
     /// Picks the chip the Calls page's history shows.
     SetCallFilter(CallFilter),
