@@ -469,6 +469,7 @@ fn header(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> Rect {
                     ui.add_space(super::rail::lights_overhang(ui.ctx()));
                 }
                 ui.add_space(room.left);
+                let veiled = super::veil::hides(ui, app.privacy_screen, ui.max_rect());
                 let picture = app.avatar(&chat.id);
                 let (subtitle, color) = subtitle(app, chat);
                 let call_here = app.call_live_here(&chat.id);
@@ -511,6 +512,10 @@ fn header(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> Rect {
                             ),
                             Layout::left_to_right(Align::Center),
                             |ui| {
+                                let opacity = ui.opacity();
+                                if veiled {
+                                    ui.multiply_opacity(0.0);
+                                }
                                 let avatar_response = widgets::avatar(
                                     ui,
                                     &palette,
@@ -520,6 +525,10 @@ fn header(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> Rect {
                                     picture.as_deref(),
                                 );
                                 avatar = avatar_response.rect;
+                                ui.set_opacity(opacity);
+                                if veiled {
+                                    super::veil::avatar(ui, &palette, avatar);
+                                }
                                 if chat.disappearing_timer().is_some() {
                                     widgets::paint_disappearing_badge(
                                         ui,
@@ -530,6 +539,9 @@ fn header(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> Rect {
                                 // Room for the name's glass pill to clear the avatar.
                                 ui.add_space(if palette.vibrant() { 14.0 } else { 4.0 });
                                 ui.vertical(|ui| {
+                                    if veiled {
+                                        ui.multiply_opacity(0.0);
+                                    }
                                     let width = ui.available_width().max(80.0);
                                     ui.set_max_width(width);
                                     // On glass the lines centre on the avatar: the
@@ -616,6 +628,9 @@ fn header(app: &mut App, ui: &mut egui::Ui, chat: &Chat) -> Rect {
                         );
                     })
                     .response;
+                if veiled && text.is_positive() {
+                    super::veil::message(ui, &palette, text, &chat.id);
+                }
                 if palette.vibrant() && text.is_positive() {
                     // A lone name gets Apple's roomier padding.
                     let padding = vec2(
@@ -1833,6 +1848,19 @@ fn composer(app: &mut App, ui: &mut egui::Ui, chat: &Chat, review_send: Option<b
                                 let selection_before = egui::TextEdit::load_state(ui.ctx(), id)
                                     .and_then(|state| state.cursor.char_range())
                                     .filter(|range| !range.is_empty());
+                                // Behind the privacy screen the draft is typed
+                                // invisibly, with bars over it, until pointed at.
+                                let veiled = !app.composer.is_empty()
+                                    && ui
+                                        .ctx()
+                                        .data(|data| data.get_temp::<Rect>(composer_pill_id()))
+                                        .map_or(app.privacy_screen, |pill| {
+                                            super::veil::hides(ui, app.privacy_screen, pill)
+                                        });
+                                let opacity = ui.opacity();
+                                if veiled {
+                                    ui.multiply_opacity(0.0);
+                                }
                                 let mut output = egui::TextEdit::multiline(&mut app.composer)
                                     .id(id)
                                     .frame(Frame::NONE)
@@ -1890,6 +1918,17 @@ fn composer(app: &mut App, ui: &mut egui::Ui, chat: &Chat, review_send: Option<b
                                     }
                                     let rect = bounds.translate(output.galley_pos.to_vec2());
                                     crate::emoji::paint_cluster(ui, cluster, rect);
+                                }
+                                ui.set_opacity(opacity);
+                                if veiled {
+                                    for row in &output.galley.rows {
+                                        super::veil::line(
+                                            ui,
+                                            output.galley_pos + row.pos.to_vec2(),
+                                            row.size,
+                                            palette.text,
+                                        );
+                                    }
                                 }
                                 // The row was sized from last frame's text. When a
                                 // keystroke wraps or unwraps a line, lay the frame
@@ -2678,6 +2717,8 @@ struct View<'a> {
     copy_rows: Option<&'a std::sync::Mutex<Vec<crate::transcript::Row>>>,
     /// How far this chat's downloading attachments have got, by message.
     download_progress: Option<&'a HashMap<String, u8>>,
+    /// The privacy screen is on: messages show as bars until pointed at.
+    privacy_screen: bool,
 }
 
 /// How far `message`'s attachment download has got, once the worker has said.
@@ -3142,6 +3183,7 @@ fn messages(app: &mut App, ui: &mut egui::Ui, chat: &Chat, under: f32) {
         copy_rows: (!app.selection.as_ref().is_some_and(|(id, _)| *id == chat.id))
             .then_some(app.copy_rows.as_ref()),
         download_progress: app.download_progress.get(&chat.id),
+        privacy_screen: app.privacy_screen,
     };
     let mut actions = Vec::new();
     let mut anchored = false;
@@ -4963,7 +5005,10 @@ fn bubble(
                     {
                         actions.push(sender_info_action(message));
                     }
-                    if ui.is_rect_visible(rect) {
+                    if ui.is_rect_visible(rect) && super::veil::hides(ui, view.privacy_screen, rect)
+                    {
+                        super::veil::avatar(ui, &view.palette, rect);
+                    } else if ui.is_rect_visible(rect) {
                         let name = (view.names_or)(&message.sender, message.sender_name.as_deref());
                         widgets::paint_avatar(
                             ui,
@@ -5582,6 +5627,11 @@ fn bubble_frame(
     let rect_id = bubble_id.with("rect");
     let previous = ui.ctx().data(|data| data.get_temp::<Rect>(rect_id));
     let early = previous.map(|rect| ui.interact(rect, bubble_id, Sense::CLICK));
+    // Behind the privacy screen the contents keep their layout and targets
+    // but are painted invisibly, with bars over them, until pointed at.
+    let veiled = previous.map_or(view.privacy_screen, |rect| {
+        super::veil::hides(ui, view.privacy_screen, rect)
+    }) && !ui.memory(|memory| memory.has_focus(bubble_id));
     // Painted once the contents are measured, beneath them.
     let backdrop = ui.painter().add(egui::Shape::Noop);
     let tail = (tailed && fill != Color32::TRANSPARENT).then_some(if own {
@@ -5596,6 +5646,9 @@ fn bubble_frame(
     let inner = Frame::new()
         .inner_margin(bubble_margin(&palette, message, over_picture))
         .show(ui, |ui| {
+            if veiled {
+                ui.multiply_opacity(0.0);
+            }
             ui.set_max_width(max_width);
             ui.spacing_mut().item_spacing.y = 4.0;
             if show_sender && view.chat.is_group() {
@@ -5732,6 +5785,29 @@ fn bubble_frame(
                 ui.clip_rect().y_range(),
             ),
         );
+    }
+    if veiled && ui.is_rect_visible(inner.response.rect) {
+        let rect = inner.response.rect;
+        let contents = if fill == Color32::TRANSPARENT {
+            // A sticker or a bare picture leaves nothing to show the bars on.
+            ui.painter().rect_filled(
+                rect,
+                10.0,
+                if own {
+                    palette.bubble_out
+                } else {
+                    palette.bubble_in
+                },
+            );
+            rect.shrink(10.0)
+        } else {
+            let margin = bubble_margin(&palette, message, over_picture);
+            Rect::from_min_max(
+                rect.min + vec2(f32::from(margin.left), f32::from(margin.top)),
+                rect.max - vec2(f32::from(margin.right), f32::from(margin.bottom)),
+            )
+        };
+        super::veil::message(ui, &palette, contents, &message.id);
     }
     ui.ctx()
         .data_mut(|data| data.insert_temp(rect_id, inner.response.rect));
@@ -7120,6 +7196,7 @@ pub(crate) fn list_menu(
         account_receipts_off: app.account_receipts_off,
         copy_rows: Some(app.copy_rows.as_ref()),
         download_progress: app.download_progress.get(&chat.id),
+        privacy_screen: app.privacy_screen,
         selecting: false,
         motion_playing: None,
         starred: marks.starred.then_some(&stars),
@@ -12840,6 +12917,7 @@ mod tests {
             account_receipts_off: false,
             copy_rows: Some(app.copy_rows.as_ref()),
             download_progress: None,
+            privacy_screen: false,
             selecting: false,
             motion_playing: None,
             starred: None,

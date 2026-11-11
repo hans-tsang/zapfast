@@ -2256,6 +2256,8 @@ pub fn apply_flags(app: &mut App, page: Option<&str>) {
             "locked-setup" => app.dialog = Some(crate::model::Dialog::UnlockLockedChats),
             // The app lock's screen, over the sample chats it hides.
             "app-lock" => app_lock_sample(app),
+            // The privacy screen over the sample chats, nothing pointed at.
+            "privacy-screen" => app.privacy_screen = true,
             "app-lock-wrong" => {
                 app_lock_sample(app);
                 // Enough wrong tries for an eight-second wait.
@@ -9634,6 +9636,8 @@ mod tests {
             "locked-prompt",
             "locked-setup",
             "app-lock",
+            "privacy-screen",
+            "privacy-screen,light",
             "app-lock-wrong",
             "app-lock-forgot",
             "app-lock-settings",

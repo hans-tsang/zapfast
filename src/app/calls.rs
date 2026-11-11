@@ -502,9 +502,9 @@ impl App {
             Some(chat) => chat.notification_sound.clone(),
             None => None,
         };
-        let (title, body, picture) = if self.app_lock.is_locked() {
-            // Behind the app lock the desktop learns that a call came, and
-            // nothing about who is calling.
+        let (title, body, picture) = if self.app_lock.is_locked() || self.privacy_screen {
+            // Behind the app lock or the privacy screen the desktop learns
+            // that a call came, and nothing about who is calling.
             (
                 "ZapFast".to_owned(),
                 crate::i18n::gettext(self.locale, "Incoming call").into_owned(),
@@ -573,7 +573,7 @@ impl App {
         if !self.account().settings.notifications || !eligible {
             return;
         }
-        let (title, body, picture) = if self.app_lock.is_locked() {
+        let (title, body, picture) = if self.app_lock.is_locked() || self.privacy_screen {
             (
                 "ZapFast".to_owned(),
                 crate::i18n::gettext(self.locale, "Incoming call").into_owned(),

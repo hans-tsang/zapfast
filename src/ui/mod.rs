@@ -29,6 +29,7 @@ pub mod polls;
 pub mod rail;
 pub mod settings;
 pub mod update;
+pub mod veil;
 mod voice_bar;
 pub mod widgets;
 

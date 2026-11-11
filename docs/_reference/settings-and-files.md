@@ -308,6 +308,22 @@ from `settings.json`, which keeps only a salted PBKDF2 verifier of the
 password. It is independent of the locked-chats code: unlocking one never
 opens the other.
 
+## Privacy screen
+
+For a café, an office, or a shared screen, `Ctrl+Shift+P` (`⌘⇧P` on macOS)
+turns the privacy screen on, and pressing it again turns it off. Chat names,
+profile pictures, chat-list previews, search results, starred messages,
+messages in the open chat, and the text you are typing are drawn as soft bars
+until you point at them. Pointing at a chat row, a message, the chat's header,
+or the message box shows it. A message reached with the keyboard is shown
+too. While the privacy screen is on, notifications say only "New message" or
+"Incoming call", as behind the app lock.
+
+The privacy screen hides content from people looking at your screen. It does
+not lock ZapFast or protect your chats from anyone using the computer: the app
+lock does that. It is not a setting and is never saved, so ZapFast always
+starts with it off.
+
 ## Updates
 
 With **Check for updates** on, ZapFast asks GitHub once a day for a newer
