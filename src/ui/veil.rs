@@ -114,9 +114,10 @@ mod tests {
         let rect = Rect::from_min_size(pos2(10.0, 10.0), vec2(100.0, 40.0));
         let mut result = false;
         for _ in 0..2 {
-            let _ = ctx.run_ui(pointer_at(pointer), |ui| {
+            let mut output = ctx.run_ui(pointer_at(pointer), |ui| {
                 result = hides(ui, active, rect);
             });
+            output.textures_delta.clear();
         }
         result
     }
